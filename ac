@@ -1910,6 +1910,96 @@ venv_stop(){
     kill -9 $venv_pid > /dev/null 2>&1
 }
 
+# ------------------------------------------------------------------------------
+# Create Fyre VM
+# ------------------------------------------------------------------------------
+#->create-vm:
+## Create a Fyre VM with given specifications.
+## For a full list of valid inputs visit: https://w3.ibm.com/w3publisher/devit/fyre/development/vm-apis
+## If no options are provided the following defaults are set:
+## cpu: 2
+## memory: 2
+## os: Ubuntu 24.04
+## ssh-key: first ssh-key found under ~/.ssh – an error is returned when there are no ssh keys available
+## description: Fyre VM created via AC CLI
+## Usage: ac [--create-vm] [--cpu 4] [--memory 8] [--os "RedHat 9.4"] [--ssh-key "my-ssh-key.pub"] [--description "eda-vm"]
+## Example:
+##  $ ac --create-vm
+##  $ ac --create-vm --cpu 4 --memory 16 --os "Ubuntu 24.04" --ssh-key ~/.ssh/my-ssh-key.pub
+##  $ ac --create-vm --cpu 4 --memory 16 --os "Ubuntu 24.04" --ssh-key ~/.ssh/my-ssh-key.pub --description "eda-vm aap-hub"
+create_vm(){
+    option_cpu=$1
+    option_memory=$2
+    option_os=$3
+    option_ssh_key=$4
+    option_description=$5
+
+    if [ -z "$option_cpu" ]; then  # if the first option is empty then no args were provided, set defaults
+        echo "No options provided, using default values."
+
+        first_key=$(find ~/.ssh -name "*.pub" -type f | head -n 1)
+        if [ -n "$first_key" ]; then
+            echo "Using ssh key $first_key"
+            default_ssh_key=$first_key
+        else
+            echo "No public keys found."
+            exit 1
+        fi
+
+        cpu=2
+        memory=2
+        os="Ubuntu 24.04"
+        ssh_key=$first_key
+        description="Fyre VM created via AC CLI"
+    else
+        if [ ! -f "$option_ssh_key" ]; then
+            echo "Provided SSH Key $option_ssh_key does not exist."
+            exit 1
+        fi
+
+        cpu=$option_cpu
+        memory=$option_memory
+        os=$option_os
+        ssh_key=$option_ssh_key
+        description="${option_description:-"Fyre VM created via AC CLI"}"
+    fi
+
+    hosts_env="$VIRTUAL_ENV/info.env"
+    if [ -f "$hosts_env" ]; then
+        . $hosts_env
+    else
+        message_error "Unable to source file: $hosts_env, exiting."
+        exit 1
+    fi
+
+    message "Creating Fyre VM with CPU: $cpu, Memory: $memory, OS: $os, SSH Key: $ssh_key, Description: $description"
+
+    exit 0
+
+    # define curl data with variables
+
+    curl -X POST -u "$FYRE_USERNAME:$FYRE_APIKEY" -H "Content-type: application/json" \
+        'https://ocpapi.svl.ibm.com/v1/vm/' \
+        -d '{
+            "quota_type": "quick_burn",
+            "time_to_live": "1",
+            "ssh_key": "<ssh_key> ",
+            "count": "1",
+            "platform": "x",
+            "cpu": "2",
+            "memory": "2",
+            "os": "<os, required>",
+            "description": "<description>",
+            "public_network": "<y/n, default is n>",
+            "dns": "<y|n, add hostname to DNS in dev.fyre.ibm.com domain, default is n>",
+            "additional_disk": [
+                "<size in gb>",
+                "<size in gb>"
+            ],
+            "check_config": "<y/n, default is n, y will validate configuration (including quota) without building>"
+        }'
+}
+
 # ==============================================================================
 # Main arg parsing
 # ==============================================================================
@@ -2032,6 +2122,10 @@ while true; do
       --venv-stop)                              # Command
             ensure_managed_venv_exists $1
             option_submitted="--venv-stop"
+            ;;
+      --create-vm)                              # Command
+            ensure_managed_venv_exists $1
+            option_submitted="--create-vm"
             ;;
       # End of main command list.
       # Start of command options.
@@ -2304,6 +2398,41 @@ while true; do
             option_sanitize $zoau
             shift
             ;;
+      # Used by:
+      # - create_vm
+      --cpu|--cpu=?*)                           # option
+            cpu=`option_processor $1 $2`
+            option_sanitize $cpu
+            shift
+            ;;
+      # Used by:
+      # - create_vm
+      --memory|--memory=?*)                     # option
+            memory=`option_processor $1 $2`
+            option_sanitize $memory
+            shift
+            ;;
+      # Used by:
+      # - create_vm
+      --os|--os=?*)                             # option
+            os=`option_processor $1 "$2"`
+            option_sanitize "$os"
+            shift
+            ;;
+      # Used by:
+      # - create_vm
+      --ssh-key|--ssh-key=?*)           # option
+            ssh_key=`option_processor $1 $2`
+            option_sanitize $ssh_key
+            shift
+            ;;
+      # Used by:
+      # - create_vm
+      --description|--description=?*)           # option
+            description=`option_processor $1 "$2"`
+            option_sanitize "$description"
+            shift
+            ;;
       # End of command options.
         --)                                     # End Arg parsing
             #shift
@@ -2383,4 +2512,6 @@ elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-start" ] ; then
     venv_start $name
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-stop" ] ; then
     venv_stop $name
+elif [ "$option_submitted" ] && [ "$option_submitted" = "--create-vm" ] ; then
+    create_vm $cpu $memory "$os" $ssh_key "$description"
 fi
