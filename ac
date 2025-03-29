@@ -1946,8 +1946,8 @@ create_vm(){
             exit 1
         fi
 
-        cpu=2
-        memory=2
+        cpu="2"
+        memory="2"
         os="Ubuntu 24.04"
         ssh_key=$first_key
         description="Fyre VM created via AC CLI"
@@ -1974,30 +1974,30 @@ create_vm(){
 
     message "Creating Fyre VM with CPU: $cpu, Memory: $memory, OS: $os, SSH Key: $ssh_key, Description: $description"
 
-    exit 0
+    public_key_content="$(cat $ssh_key)"
 
-    # define curl data with variables
+    # vm_data="{\"quota_type\": \"quick_burn\", \"time_to_live\": \"1\",\"ssh_key\": \"$public_key_content\", \"count\": \"1\",\"platform\": \"x\", \"cpu\": \"$cpu\", \"memory\": \"$memory\", \"os\": \"$os\", \"description\": \"$description\", \"public_network\": \"n\", \"dns\": \"y\", \"check_config\": \"y\"}"
+    vm_data=$(cat <<EOF
+{
+  "quota_type": "quick_burn",
+  "time_to_live": "1",
+  "ssh_key": "$public_key_content",
+  "count": "1",
+  "platform": "x",
+  "cpu": "$cpu",
+  "memory": "$memory",
+  "os": "$os",
+  "description": "$description",
+  "public_network": "n",
+  "dns": "y",
+  "check_config": "n"
+}
+EOF
+)
 
     curl -X POST -u "$FYRE_USERNAME:$FYRE_APIKEY" -H "Content-type: application/json" \
         'https://ocpapi.svl.ibm.com/v1/vm/' \
-        -d '{
-            "quota_type": "quick_burn",
-            "time_to_live": "1",
-            "ssh_key": "<ssh_key> ",
-            "count": "1",
-            "platform": "x",
-            "cpu": "2",
-            "memory": "2",
-            "os": "<os, required>",
-            "description": "<description>",
-            "public_network": "<y/n, default is n>",
-            "dns": "<y|n, add hostname to DNS in dev.fyre.ibm.com domain, default is n>",
-            "additional_disk": [
-                "<size in gb>",
-                "<size in gb>"
-            ],
-            "check_config": "<y/n, default is n, y will validate configuration (including quota) without building>"
-        }'
+        -d "$vm_data"
 }
 
 # ==============================================================================
