@@ -2037,6 +2037,31 @@ delete_vm(){
     curl -X DELETE -u "$FYRE_USERNAME:$FYRE_APIKEY" "https://ocpapi.svl.ibm.com/v1/vm/$option_vm_id"
 }
 
+# ------------------------------------------------------------------------------
+# Retrieve Fyre VM details
+# ------------------------------------------------------------------------------
+#->vm-details:
+## Retrieve VM details by its id, fqdn or ip address.
+## Usage: ac [--vm-details] [--vm-id <id|fqdn|ip>]
+## Options:
+##      vm-id (required) - (id|fqdn|ip):
+##          - VM identifier, it can be either its ID, FQDN or IP address
+## Example:
+##  $ ac --vm-details --vm-id 1-5630705
+##  $ ac --vm-details --vm-id v1-5630705.dev.fyre.ibm.com
+##  $ ac --vm-details --vm-id 9.31.100.12
+vm_details(){
+    option_vm_id=${1:-""}
+
+    if [ -z "$option_vm_id" ]; then
+        message_error "Missing required parameter --vm-id"
+    fi
+
+    source_env_file || exit 1
+
+    curl -X GET -u "$FYRE_USERNAME:$FYRE_APIKEY" "https://ocpapi.svl.ibm.com/v1/vm/$option_vm_id/details"
+}
+
 # ==============================================================================
 # Main arg parsing
 # ==============================================================================
@@ -2167,6 +2192,10 @@ while true; do
       --delete-vm)                              # Command
             ensure_managed_venv_exists $1
             option_submitted="--delete-vm"
+            ;;
+      --vm-details)                             # Command
+            ensure_managed_venv_exists $1
+            option_submitted="--vm-details"
             ;;
       # End of main command list.
       # Start of command options.
@@ -2483,6 +2512,7 @@ while true; do
             ;;
       # Used by:
       # - delete_vm
+      # - vm_details
       --vm-id|--vm-id=?*)           # option
             vm_id=`option_processor $1 "$2"`
             option_sanitize "$vm_id"
@@ -2571,4 +2601,6 @@ elif [ "$option_submitted" ] && [ "$option_submitted" = "--create-vm" ] ; then
     create_vm "${cpu:-""}" "${memory:-""}" "${os:-""}" "${ssh_key:-""}" "${time_to_live:-""}" "${description:-""}"
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--delete-vm" ] ; then
     delete_vm $vm_id
+elif [ "$option_submitted" ] && [ "$option_submitted" = "--vm-details" ] ; then
+    vm_details $vm_id
 fi
