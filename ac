@@ -1916,7 +1916,7 @@ venv_stop(){
 #->create-vm:
 ## Create a Fyre VM with given specifications.
 ## Supports format: <option> <value> and <option>=<value>
-## Usage: ac [--create-vm] [--cpu <int>] [--memory <int>] [--os <str>] [--ssh-key <path>] [--description <str>]
+## Usage: ac [--create-vm] [--cpu <int>] [--memory <int>] [--os <str>] [--ssh-key <path>] [--time-to-live <int>] [--description <str>]
 ## Options:
 ##      cpu (optional) - (int):
 ##          - Number of CPUs to allocate to the VM
@@ -1932,12 +1932,15 @@ venv_stop(){
 ##              * "Ubuntu 22.04"
 ##              * "RedHat 9.4"
 ##              * "RedHat 8.8"
-##              * "Fedora 40"
+##              * "Centos Stream 9"
 ##          - For a full list of valid OS options visit: https://w3.ibm.com/w3publisher/devit/fyre/development/vm-apis
 ##      ssh-key (optional) - (path):
 ##          - Path to the SSH public key file to use for VM access
 ##          - Default is the first SSH public key found in ~/.ssh
 ##          - An error is returned when no SSH keys are available
+##      time-to-live (optional) - (int):
+##          - Time for the quick burn to last in hours
+##          - Default is 1
 ##      description (optional) - (str):
 ##          - Description for the VM to create
 ##          - Default is "Fyre VM created via AC CLI"
@@ -1950,7 +1953,8 @@ create_vm(){
     option_memory=${2:-"2"}
     option_os=${3:-"Ubuntu 24.04"}
     option_ssh_key=${4:-""}
-    option_description=${5:-"Fyre VM created via AC CLI"}
+    option_time_to_live=${5:-"1"}
+    option_description=${6:-"Fyre VM created via AC CLI"}
 
     if [ -z "$option_ssh_key" ]; then  # if no ssh key is provided search for one
         first_key=$(find ~/.ssh -name "*.pub" -type f | head -n 1)
@@ -1976,15 +1980,14 @@ create_vm(){
         exit 1
     fi
 
-    message "Creating Fyre VM with CPU: $option_cpu, Memory: $option_memory, OS: $option_os, SSH Key: $option_ssh_key, Description: $option_description"
+    message "Creating Fyre VM with CPU: $option_cpu, Memory: $option_memory, OS: $option_os, SSH Key: $option_ssh_key, Time to live: $option_time_to_live, Description: $option_description"
     public_key_content="$(cat $option_ssh_key)"
-    exit 0
 
     # vm_data="{\"quota_type\": \"quick_burn\", \"time_to_live\": \"1\",\"ssh_key\": \"$public_key_content\", \"count\": \"1\",\"platform\": \"x\", \"cpu\": \"$cpu\", \"memory\": \"$memory\", \"os\": \"$os\", \"description\": \"$description\", \"public_network\": \"n\", \"dns\": \"y\", \"check_config\": \"y\"}"
     vm_data=$(cat <<EOF
 {
   "quota_type": "quick_burn",
-  "time_to_live": "1",
+  "time_to_live": "$option_time_to_live",
   "ssh_key": "$public_key_content",
   "count": "1",
   "platform": "x",
@@ -2425,9 +2428,16 @@ while true; do
             ;;
       # Used by:
       # - create_vm
-      --ssh-key|--ssh-key=?*)           # option
+      --ssh-key|--ssh-key=?*)                   # option
             ssh_key=`option_processor $1 $2`
             option_sanitize $ssh_key
+            shift
+            ;;
+      # Used by:
+      # - create_vm
+      --time-to-live|--time-to-live=?*)           # option
+            time_to_live=`option_processor $1 $2`
+            option_sanitize $time_to_live
             shift
             ;;
       # Used by:
@@ -2517,5 +2527,5 @@ elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-start" ] ; then
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-stop" ] ; then
     venv_stop $name
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--create-vm" ] ; then
-    create_vm "${cpu:-""}" "${memory:-""}" "${os:-""}" "${ssh_key:-""}" "${description:-""}"
+    create_vm "${cpu:-""}" "${memory:-""}" "${os:-""}" "${ssh_key:-""}" "${time_to_live:-""}" "${description:-""}"
 fi
