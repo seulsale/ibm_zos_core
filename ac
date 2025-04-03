@@ -2027,6 +2027,14 @@ EOF
 ##  $ ac --delete-vm --vm-id 9.31.100.12
 delete_vm(){
     option_vm_id=${1:-""}
+
+    if [ -z "$option_vm_id" ]; then
+        message_error "Missing required parameter --vm-id"
+    fi
+
+    source_env_file || exit 1
+
+    curl -X DELETE -u "$FYRE_USERNAME:$FYRE_APIKEY" "https://ocpapi.svl.ibm.com/v1/vm/$option_vm_id"
 }
 
 # ==============================================================================
@@ -2155,6 +2163,10 @@ while true; do
       --create-vm)                              # Command
             ensure_managed_venv_exists $1
             option_submitted="--create-vm"
+            ;;
+      --delete-vm)                              # Command
+            ensure_managed_venv_exists $1
+            option_submitted="--delete-vm"
             ;;
       # End of main command list.
       # Start of command options.
@@ -2469,6 +2481,13 @@ while true; do
             option_sanitize "$description"
             shift
             ;;
+      # Used by:
+      # - delete_vm
+      --vm-id|--vm-id=?*)           # option
+            vm_id=`option_processor $1 "$2"`
+            option_sanitize "$vm_id"
+            shift
+            ;;
       # End of command options.
         --)                                     # End Arg parsing
             #shift
@@ -2550,4 +2569,6 @@ elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-stop" ] ; then
     venv_stop $name
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--create-vm" ] ; then
     create_vm "${cpu:-""}" "${memory:-""}" "${os:-""}" "${ssh_key:-""}" "${time_to_live:-""}" "${description:-""}"
+elif [ "$option_submitted" ] && [ "$option_submitted" = "--delete-vm" ] ; then
+    delete_vm $vm_id
 fi
