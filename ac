@@ -1915,53 +1915,57 @@ venv_stop(){
 # ------------------------------------------------------------------------------
 #->create-vm:
 ## Create a Fyre VM with given specifications.
-## For a full list of valid inputs visit: https://w3.ibm.com/w3publisher/devit/fyre/development/vm-apis
-## If no options are provided the following defaults are set:
-## cpu: 2
-## memory: 2
-## os: Ubuntu 24.04
-## ssh-key: first ssh-key found under ~/.ssh – an error is returned when there are no ssh keys available
-## description: Fyre VM created via AC CLI
-## Usage: ac [--create-vm] [--cpu 4] [--memory 8] [--os "RedHat 9.4"] [--ssh-key "my-ssh-key.pub"] [--description "eda-vm"]
+## Supports format: <option> <value> and <option>=<value>
+## Usage: ac [--create-vm] [--cpu <int>] [--memory <int>] [--os <str>] [--ssh-key <path>] [--description <str>]
+## Options:
+##      cpu (optional) - (int):
+##          - Number of CPUs to allocate to the VM
+##          - Default is 2
+##      memory (optional) - (int):
+##          - Amount of memory in GB to allocate to the VM
+##          - Default is 2
+##      os (optional) - (str):
+##          - Operating system to install on the VM
+##          - Default is "Ubuntu 24.04"
+##          - Available options include:
+##              * "Ubuntu 24.04"
+##              * "Ubuntu 22.04"
+##              * "RedHat 9.4"
+##              * "RedHat 8.8"
+##              * "Fedora 40"
+##          - For a full list of valid OS options visit: https://w3.ibm.com/w3publisher/devit/fyre/development/vm-apis
+##      ssh-key (optional) - (path):
+##          - Path to the SSH public key file to use for VM access
+##          - Default is the first SSH public key found in ~/.ssh
+##          - An error is returned when no SSH keys are available
+##      description (optional) - (str):
+##          - Description for the VM to create
+##          - Default is "Fyre VM created via AC CLI"
 ## Example:
 ##  $ ac --create-vm
-##  $ ac --create-vm --cpu 4 --memory 16 --os "Ubuntu 24.04" --ssh-key ~/.ssh/my-ssh-key.pub
-##  $ ac --create-vm --cpu 4 --memory 16 --os "Ubuntu 24.04" --ssh-key ~/.ssh/my-ssh-key.pub --description "eda-vm aap-hub"
+##  $ ac --create-vm --memory 16 --os "Ubuntu 22.04" --ssh-key "~/.ssh/my-ssh-key.pub"
+##  $ ac --create-vm --cpu 4 --memory 16 --os "Ubuntu 24.04" --ssh-key "~/.ssh/my-ssh-key.pub" --description "eda-vm aap-hub"
 create_vm(){
-    option_cpu=$1
-    option_memory=$2
-    option_os=$3
-    option_ssh_key=$4
-    option_description=$5
+    option_cpu=${1:-"2"}
+    option_memory=${2:-"2"}
+    option_os=${3:-"Ubuntu 24.04"}
+    option_ssh_key=${4:-""}
+    option_description=${5:-"Fyre VM created via AC CLI"}
 
-    if [ -z "$option_cpu" ]; then  # if the first option is empty then no args were provided, set defaults
-        echo "No options provided, using default values."
-
+    if [ -z "$option_ssh_key" ]; then  # if no ssh key is provided search for one
         first_key=$(find ~/.ssh -name "*.pub" -type f | head -n 1)
         if [ -n "$first_key" ]; then
             echo "Using ssh key $first_key"
-            default_ssh_key=$first_key
         else
-            echo "No public keys found."
+            echo "No public keys found. Create a new one and pass it with the --ssh-key parameter"
             exit 1
         fi
-
-        cpu="2"
-        memory="2"
-        os="Ubuntu 24.04"
-        ssh_key=$first_key
-        description="Fyre VM created via AC CLI"
+        option_ssh_key=$first_key
     else
         if [ ! -f "$option_ssh_key" ]; then
             echo "Provided SSH Key $option_ssh_key does not exist."
             exit 1
         fi
-
-        cpu=$option_cpu
-        memory=$option_memory
-        os=$option_os
-        ssh_key=$option_ssh_key
-        description="${option_description:-"Fyre VM created via AC CLI"}"
     fi
 
     hosts_env="$VIRTUAL_ENV/info.env"
@@ -1972,9 +1976,9 @@ create_vm(){
         exit 1
     fi
 
-    message "Creating Fyre VM with CPU: $cpu, Memory: $memory, OS: $os, SSH Key: $ssh_key, Description: $description"
-
-    public_key_content="$(cat $ssh_key)"
+    message "Creating Fyre VM with CPU: $option_cpu, Memory: $option_memory, OS: $option_os, SSH Key: $option_ssh_key, Description: $option_description"
+    public_key_content="$(cat $option_ssh_key)"
+    exit 0
 
     # vm_data="{\"quota_type\": \"quick_burn\", \"time_to_live\": \"1\",\"ssh_key\": \"$public_key_content\", \"count\": \"1\",\"platform\": \"x\", \"cpu\": \"$cpu\", \"memory\": \"$memory\", \"os\": \"$os\", \"description\": \"$description\", \"public_network\": \"n\", \"dns\": \"y\", \"check_config\": \"y\"}"
     vm_data=$(cat <<EOF
@@ -1984,11 +1988,11 @@ create_vm(){
   "ssh_key": "$public_key_content",
   "count": "1",
   "platform": "x",
-  "cpu": "$cpu",
-  "memory": "$memory",
-  "os": "$os",
-  "description": "$description",
-  "public_network": "n",
+  "cpu": "$option_cpu",
+  "memory": "$option_memory",
+  "os": "$option_os",
+  "description": "$option_description",
+  "public_network": "y",
   "dns": "y",
   "check_config": "n"
 }
@@ -2513,5 +2517,5 @@ elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-start" ] ; then
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--venv-stop" ] ; then
     venv_stop $name
 elif [ "$option_submitted" ] && [ "$option_submitted" = "--create-vm" ] ; then
-    create_vm $cpu $memory "$os" $ssh_key "$description"
+    create_vm "${cpu:-""}" "${memory:-""}" "${os:-""}" "${ssh_key:-""}" "${description:-""}"
 fi
