@@ -83,6 +83,18 @@ validate_venv(){
     fi
 }
 
+# Helper method to source the environment file
+source_env_file() {
+  local hosts_env="$VIRTUAL_ENV/info.env"
+  if [ -f "$hosts_env" ]; then
+    . $hosts_env
+    return 0  # Success
+  else
+    message_error "Unable to source file: $hosts_env, exiting."
+    return 1  # Failure
+  fi
+}
+
 # TODO: Wrap this with an exist check so that you can override the venv from the shell
 VENV=`latest_venv`
 
@@ -1915,7 +1927,6 @@ venv_stop(){
 # ------------------------------------------------------------------------------
 #->create-vm:
 ## Create a Fyre VM with given specifications.
-## Supports format: <option> <value> and <option>=<value>
 ## Usage: ac [--create-vm] [--cpu <int>] [--memory <int>] [--os <str>] [--ssh-key <path>] [--time-to-live <int>] [--description <str>]
 ## Options:
 ##      cpu (optional) - (int):
@@ -1972,13 +1983,7 @@ create_vm(){
         fi
     fi
 
-    hosts_env="$VIRTUAL_ENV/info.env"
-    if [ -f "$hosts_env" ]; then
-        . $hosts_env
-    else
-        message_error "Unable to source file: $hosts_env, exiting."
-        exit 1
-    fi
+    source_env_file || exit 1
 
     message "Creating Fyre VM with CPU: $option_cpu, Memory: $option_memory, OS: $option_os, SSH Key: $option_ssh_key, Time to live: $option_time_to_live, Description: $option_description"
     public_key_content="$(cat $option_ssh_key)"
@@ -2005,6 +2010,23 @@ EOF
     curl -X POST -u "$FYRE_USERNAME:$FYRE_APIKEY" -H "Content-type: application/json" \
         'https://ocpapi.svl.ibm.com/v1/vm/' \
         -d "$vm_data"
+}
+
+# ------------------------------------------------------------------------------
+# Delete Fyre VM
+# ------------------------------------------------------------------------------
+#->delete-vm:
+## Delete a Fyre VM by its id, fqdn or ip address.
+## Usage: ac [--delete-vm] [--vm-id <id|fqdn|ip>]
+## Options:
+##      vm-id (required) - (id|fqdn|ip):
+##          - VM identifier, it can be either its ID, FQDN or IP address
+## Example:
+##  $ ac --delete-vm --vm-id 1-5630705
+##  $ ac --delete-vm --vm-id v1-5630705.dev.fyre.ibm.com
+##  $ ac --delete-vm --vm-id 9.31.100.12
+delete_vm(){
+    option_vm_id=${1:-""}
 }
 
 # ==============================================================================
